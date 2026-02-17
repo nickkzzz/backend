@@ -18,7 +18,13 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-CORS(app)
+
+# 🔥 FIXED CORS (VERY IMPORTANT)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": "*"}},
+    supports_credentials=True,
+)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "quiz.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -89,8 +95,11 @@ def parse_mcqs(text):
 
 # ------------------ ROUTES ------------------
 
-@app.route("/api/generate", methods=["POST"])
+@app.route("/api/generate", methods=["POST", "OPTIONS"])
 def generate():
+    if request.method == "OPTIONS":
+        return jsonify({"ok": True})
+
     file = request.files.get("pdf")
     paragraph = request.form.get("paragraph", "")
     num_q = int(request.form.get("num_q", 10))
@@ -145,9 +154,12 @@ def get_quiz(quiz_id):
     })
 
 
-@app.route("/api/quiz/<quiz_id>/join", methods=["POST"])
+@app.route("/api/quiz/<quiz_id>/join", methods=["POST", "OPTIONS"])
 def join_quiz(quiz_id):
-    data = request.get_json(silent=True) or {}
+    if request.method == "OPTIONS":
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
     name = (data.get("name") or "").strip()
 
     if not name:
@@ -168,10 +180,12 @@ def join_quiz(quiz_id):
     return jsonify({"success": True})
 
 
-# 🔥 UPDATED SUBMIT ROUTE
-@app.route("/api/quiz/<quiz_id>/submit", methods=["POST"])
+@app.route("/api/quiz/<quiz_id>/submit", methods=["POST", "OPTIONS"])
 def submit_quiz(quiz_id):
-    data = request.get_json(silent=True) or {}
+    if request.method == "OPTIONS":
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
     name = data.get("name")
     answers = data.get("answers", {})
 
@@ -226,5 +240,6 @@ def admin_panel(quiz_id):
     })
 
 
+# ------------------ RUN ------------------
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)
